@@ -1,0 +1,35 @@
+{
+  "summary": {
+    "total_tests": 4,
+    "passed": 3,
+    "failed": 1,
+    "success_rate": 75.0,
+    "duration_seconds": 702.9864211082458,
+    "timestamp": "2025-12-14T08:26:29.332336"
+  },
+  "results": {
+    "unit_tests": {
+      "return_code": 0,
+      "passed": true
+    },
+    "validation_tests": {
+      "passed": true,
+      "skipped": true,
+      "reason": "Shell scripts not supported on Windows"
+    },
+    "integration_tests": {
+      "return_code": 1,
+      "passed": false
+    },
+    "wsl_tests": {
+      "passed": true,
+      "skipped": true,
+      "reason": "Shell scripts not supported on Windows"
+    }
+  },
+  "system_info": {
+    "platform": "win32",
+    "python_version": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+    "working_directory": "C:\\Users\\tyler\\Documents\\devel\\github\\ollama"
+  }
+}

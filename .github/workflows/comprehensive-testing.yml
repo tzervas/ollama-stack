@@ -1,0 +1,350 @@
+# GitHub Actions CI/CD Pipeline for Ollama + Open-WebUI Setup
+# Comprehensive testing and validation for production deployments
+
+name: Comprehensive Testing Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run full tests weekly on Sundays
+    - cron: '0 2 * * 0'
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9, "3.10", "3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install uv
+      run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    - name: Install dependencies
+      run: |
+        uv pip install --system -r requirements-test.txt
+        uv pip install --system -r requirements.txt
+
+    - name: Run unit tests with coverage
+      run: |
+        python -m pytest test/test_setup.py -v --cov=setup --cov-report=xml --cov-report=term-missing
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unit-tests
+        name: Unit Tests Coverage
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      docker:
+        image: docker:dind
+        options: --privileged
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    - name: Install dependencies
+      run: |
+        uv pip install --system -r requirements-test.txt
+        uv pip install --system -r requirements.txt
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Run integration tests
+      run: python test/run_tests.py --integration-only --ci
+
+    - name: Upload test logs
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: integration-test-logs
+        path: test/logs_*.txt
+
+  api-tests:
+    name: API Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      docker:
+        image: docker:dind
+        options: --privileged
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    - name: Install dependencies
+      run: |
+        uv pip install --system -r requirements-test.txt
+        uv pip install --system -r requirements.txt
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Run API integration tests
+      run: |
+        export RUN_FULL_API_TESTS=1
+        python -m pytest test/test_api_integration.py -v --tb=short
+
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    services:
+      docker:
+        image: docker:dind
+        options: --privileged
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    - name: Install security testing tools
+      run: |
+        uv pip install --system -r requirements-test.txt
+        uv pip install --system safety bandit
+
+    - name: Run security tests
+      run: python test/test_security.py
+
+    - name: Run security audit
+      run: python test/test_security.py --audit
+
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: |
+          test/security_results.json
+          test/security_audit.json
+
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    services:
+      docker:
+        image: docker:dind
+        options: --privileged
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    - name: Install dependencies
+      run: |
+        uv pip install --system -r requirements-test.txt
+        uv pip install --system -r requirements.txt
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Run performance tests
+      run: python test/test_performance.py
+
+    - name: Run performance regression tests
+      run: python test/test_performance.py --regression
+
+    - name: Upload performance reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-reports
+        path: |
+          test/performance_results.json
+          test/performance_baseline.json
+
+  cross-platform-validation:
+    name: Cross-Platform Validation
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    - name: Install dependencies
+      run: |
+        uv pip install --system -r requirements.txt
+
+    - name: Run validation tests
+      run: |
+        python setup.py setup
+        python setup.py certs --skip-dns --skip-caddy
+
+    - name: Test platform detection
+      run: python -c "from setup import OllamaSetup; s = OllamaSetup(); print(f'Detected platform: {s.detect_platform()}')"
+
+  comprehensive-test-run:
+    name: Comprehensive Test Run
+    runs-on: ubuntu-latest
+    services:
+      docker:
+        image: docker:dind
+        options: --privileged
+    needs: [unit-tests, integration-tests]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    - name: Install dependencies
+      run: |
+        uv pip install --system -r requirements-test.txt
+        uv pip install --system -r requirements.txt
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Run comprehensive test suite
+      run: python test/run_tests.py --ci
+
+    - name: Upload comprehensive test report
+      uses: actions/upload-artifact@v3
+      with:
+        name: comprehensive-test-report
+        path: |
+          test/test_report.json
+          test/coverage.html
+          test/logs_*.txt
+
+  deploy-validation:
+    name: Deploy Validation
+    runs-on: ubuntu-latest
+    services:
+      docker:
+        image: docker:dind
+        options: --privileged
+    needs: [comprehensive-test-run]
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    - name: Install dependencies
+      run: |
+        uv pip install --system -r requirements.txt
+
+    - name: Validate production deployment
+      run: |
+        python setup.py setup
+        python setup.py compose config  # Validate docker-compose configuration
+        python setup.py certs --skip-dns --skip-caddy
+
+    - name: Build test containers
+      run: docker build -f Dockerfile.test -t ollama-test .
+
+    - name: Validate container builds
+      run: |
+        docker run --rm ollama-test python --version
+        docker run --rm ollama-test python -c "import sys; print('Python imports work')"
+
+  nightly-regression:
+    name: Nightly Regression Tests
+    runs-on: ubuntu-latest
+    services:
+      docker:
+        image: docker:dind
+        options: --privileged
+    if: github.event.schedule == '0 2 * * 0'  # Only on scheduled runs
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    - name: Install dependencies
+      run: |
+        uv pip install --system -r requirements-test.txt
+        uv pip install --system -r requirements.txt
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Update performance baseline
+      run: python test/test_performance.py --baseline
+
+    - name: Run full regression test suite
+      run: |
+        export RUN_FULL_API_TESTS=1
+        python test/run_tests.py --ci
+
+    - name: Upload regression reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: nightly-regression-reports
+        path: |
+          test/test_report.json
+          test/performance_baseline.json
+          test/security_results.json

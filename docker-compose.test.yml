@@ -1,0 +1,149 @@
+name: ollama-test
+
+services:
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    image: ollama-test-runner
+    container_name: ollama-test-runner
+    volumes:
+      # Mount Docker socket for containerized testing
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Mount project directory
+      - .:/app
+      # Mount Docker volumes for persistence during testing
+      - ollama-test:/root/.ollama
+      - open-webui-test:/app/backend/data
+      - caddy-data-test:/data
+      - caddy-config-test:/config
+      # Mount log volume for persistent logging
+      - test-logs:/app/test/logs
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - PYTHONPATH=/app
+      - OLLAMA_URL=http://ollama:11434
+      - WEBUI_URL=http://open-webui:8080
+      - CADDY_URL=http://caddy:80
+    working_dir: /app
+    command: ["tail", "-f", "/dev/null"]
+    networks:
+      - ollama-test-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+        labels: "service=test-runner"
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-test-ollama
+    environment:
+      - OLLAMA_DEBUG=1
+      - OLLAMA_LOW_VRAM=true
+    volumes:
+      - ollama-test:/root/.ollama
+    networks:
+      - ollama-test-net
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+          cpus: '2.0'
+        reservations:
+          memory: 1g
+          cpus: '0.5'
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 bash -c 'echo > /dev/tcp/localhost/11434' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+        labels: "service=ollama"
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: ollama-test-open-webui
+    # No external port exposure for testing - accessed via Docker network
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - DEBUG=true
+    volumes:
+      - open-webui-test:/app/backend/data
+    networks:
+      - ollama-test-net
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          cpus: '1.0'
+        reservations:
+          memory: 512m
+          cpus: '0.25'
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+        labels: "service=open-webui"
+
+  caddy:
+    image: caddy:2
+    container_name: ollama-test-caddy
+    ports:
+      - "8081:80"  # Use different port for testing to avoid conflicts
+      - "8444:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy-data-test:/data
+      - caddy-config-test:/config
+    environment:
+      - DOMAIN=caddy  # Use caddy hostname for testing
+    networks:
+      - ollama-test-net
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: '0.5'
+        reservations:
+          memory: 64m
+          cpus: '0.1'
+    depends_on:
+      open-webui:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+        labels: "service=caddy"
+
+networks:
+  ollama-test-net:
+    driver: bridge
+
+volumes:
+  ollama-test:
+  open-webui-test:
+  caddy-data-test:
+  caddy-config-test:
+  test-logs:

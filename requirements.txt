@@ -1,0 +1,7 @@
+# Python dependencies for Ollama + Open-WebUI setup
+# Install with: uv pip install -r requirements.txt
+# Or fallback: pip install -r requirements.txt
+
+# Core dependencies used by setup.py
+psutil>=5.9.0  # System monitoring
+requests>=2.31.0  # HTTP requests for API testing

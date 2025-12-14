@@ -1,0 +1,119 @@
+services:
+  ollama:
+    image: ${OLLAMA_IMAGE:-ollama/ollama}
+    platform: ${DOCKER_PLATFORM:-linux/amd64}
+    environment:
+      - OLLAMA_DEBUG=1
+      - OLLAMA_LOW_VRAM=${OLLAMA_LOW_VRAM:-false}
+    volumes:
+      - ollama:/root/.ollama
+    networks:
+      - ollama-net
+    deploy:
+      resources:
+        limits:
+          memory: ${OLLAMA_MEMORY_LIMIT:-8g}
+          cpus: ${OLLAMA_CPU_LIMIT:-4.0}
+        reservations:
+          memory: ${OLLAMA_MEMORY_RESERVATION:-2g}
+          cpus: ${OLLAMA_CPU_RESERVATION:-1.0}
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 bash -c 'echo > /dev/tcp/localhost/11434' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=ollama,platform=${DOCKER_PLATFORM}"
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    platform: ${DOCKER_PLATFORM:-linux/amd64}
+    # Remove direct port exposure when using Caddy reverse proxy
+    # ports:
+    #   - "8080:8080"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - DEBUG=true
+    volumes:
+      - open-webui:/app/backend/data
+    networks:
+      - ollama-net
+    deploy:
+      resources:
+        limits:
+          memory: ${WEBUI_MEMORY_LIMIT:-2g}
+          cpus: ${WEBUI_CPU_LIMIT:-2.0}
+        reservations:
+          memory: ${WEBUI_MEMORY_RESERVATION:-512m}
+          cpus: ${WEBUI_CPU_RESERVATION:-0.5}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/config"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=open-webui,platform=${DOCKER_PLATFORM}"
+
+  caddy:
+    image: caddy:2
+    platform: ${DOCKER_PLATFORM:-linux/amd64}
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+      - EMAIL=${EMAIL}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+    networks:
+      - ollama-net
+    deploy:
+      resources:
+        limits:
+          memory: ${CADDY_MEMORY_LIMIT:-512m}
+          cpus: ${CADDY_CPU_LIMIT:-1.0}
+        reservations:
+          memory: ${CADDY_MEMORY_RESERVATION:-128m}
+          cpus: ${CADDY_CPU_RESERVATION:-0.2}
+    depends_on:
+      open-webui:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=caddy,platform=${DOCKER_PLATFORM}"
+
+networks:
+  ollama-net:
+    driver: bridge
+
+volumes:
+  ollama:
+  open-webui:
+  caddy_data:
+  caddy_config:

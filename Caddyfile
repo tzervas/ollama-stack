@@ -1,0 +1,33 @@
+# Caddyfile for Ollama + Open-WebUI
+# Supports both self-signed certificates (default) and Let's Encrypt
+
+{$DOMAIN:localhost} {
+	# Reverse proxy to Open-WebUI
+	reverse_proxy open-webui:8080
+
+	# SSL configuration
+	tls internal {
+		protocols tls1.2 tls1.3
+	}
+
+	# Security headers
+	header {
+		# Enable HSTS
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		# Prevent clickjacking
+		X-Frame-Options "DENY"
+		# XSS protection
+		X-XSS-Protection "1; mode=block"
+		# Prevent MIME type sniffing
+		X-Content-Type-Options "nosniff"
+		# Referrer policy
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	# Logging
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}
