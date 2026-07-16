@@ -15,7 +15,7 @@ on:
 jobs:
   unit-tests:
     name: Unit Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     strategy:
       matrix:
         python-version: [3.8, 3.9, "3.10", "3.11", "3.12"]
@@ -49,7 +49,7 @@ jobs:
 
   integration-tests:
     name: Integration Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     services:
       docker:
         image: docker:dind
@@ -86,7 +86,7 @@ jobs:
 
   api-tests:
     name: API Integration Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     services:
       docker:
         image: docker:dind
@@ -118,7 +118,7 @@ jobs:
 
   security-tests:
     name: Security Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     services:
       docker:
         image: docker:dind
@@ -156,7 +156,7 @@ jobs:
 
   performance-tests:
     name: Performance Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     services:
       docker:
         image: docker:dind
@@ -197,7 +197,7 @@ jobs:
 
   cross-platform-validation:
     name: Cross-Platform Validation
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os == 'macos-latest' && 'macos-latest' || fromJSON('["self-hosted", "linux", "x64", "podman"]') }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -227,7 +227,7 @@ jobs:
 
   comprehensive-test-run:
     name: Comprehensive Test Run
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     services:
       docker:
         image: docker:dind
@@ -267,7 +267,7 @@ jobs:
 
   deploy-validation:
     name: Deploy Validation
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     services:
       docker:
         image: docker:dind
@@ -306,7 +306,7 @@ jobs:
 
   nightly-regression:
     name: Nightly Regression Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, podman]
     services:
       docker:
         image: docker:dind
