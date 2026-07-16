@@ -151,5 +151,4 @@ case "${1:-}" in
         echo "Log files are stored in: $LOG_DIR"
         echo "Run integration tests first: ./test/integration.sh"
         ;;
-esac</content>
-<parameter name="filePath">c:\Users\tyler\Documents\devel\github\ollama\test\analyze_logs.sh
+esac
