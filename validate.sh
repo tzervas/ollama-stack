@@ -1,37 +1,52 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Lightweight local validation for ollama-stack (no multi-OS shell layouts).
+set -euo pipefail
+cd "$(dirname "$0")"
 
-echo "Validating cross-platform setup scripts using containers..."
+echo "Validating ollama-stack..."
 
-# Validate Linux setup.sh
-echo "Validating Linux setup.sh..."
-docker run --rm -v "$(pwd)/linux:/scripts" koalaman/shellcheck:stable /scripts/setup.sh
-if [ $? -eq 0 ]; then
-    echo "Linux setup.sh: PASSED"
+fail=0
+
+echo "→ Python syntax: setup.py"
+python3 -m py_compile setup.py || fail=1
+
+echo "→ Python syntax: test/*.py"
+for f in test/test_*.py; do
+  python3 -m py_compile "$f" || fail=1
+done
+
+echo "→ Shell syntax: validate.sh + test helpers"
+bash -n validate.sh || fail=1
+for f in test/*.sh; do
+  [ -f "$f" ] || continue
+  bash -n "$f" || fail=1
+done
+
+if command -v docker >/dev/null 2>&1; then
+  echo "→ docker compose config"
+  if docker compose version >/dev/null 2>&1; then
+    docker compose -f docker-compose.yml config >/dev/null || fail=1
+    docker compose -f docker-compose.test.yml config >/dev/null || fail=1
+  elif command -v docker-compose >/dev/null 2>&1; then
+    docker-compose -f docker-compose.yml config >/dev/null || fail=1
+    docker-compose -f docker-compose.test.yml config >/dev/null || fail=1
+  else
+    echo "  (docker present but compose unavailable — skip)"
+  fi
 else
-    echo "Linux setup.sh: FAILED"
+  echo "→ docker compose config (skipped — docker not installed)"
 fi
 
-# Validate macOS setup.fish
-echo "Validating macOS setup.fish..."
-if [ -f macos/setup.fish ]; then
-    echo "macOS setup.fish: PASSED"
+if [ -d .venv ]; then
+  echo "→ unit tests (test_setup.py)"
+  .venv/bin/python -m pytest test/test_setup.py -q -p no:cov --override-ini='addopts=' || fail=1
 else
-    echo "macOS setup.fish: FAILED"
+  echo "→ unit tests (skipped — no .venv; run: uv venv && uv pip install -r requirements-test.txt)"
 fi
 
-# Validate Windows setup.ps1
-echo "Validating Windows setup.ps1..."
-# Use a container with PowerShell
-docker run --rm -v "$(pwd)/windows:/scripts" mcr.microsoft.com/powershell:latest pwsh -Command "
-Install-Module -Name PSScriptAnalyzer -RequiredVersion 1.21.0 -Force -SkipPublisherCheck
-Import-Module PSScriptAnalyzer
-\$results = Invoke-ScriptAnalyzer -Path /scripts/setup.ps1 -ExcludeRule PSAvoidUsingWriteHost
-if (\$results) {
-    Write-Host 'Windows setup.ps1: FAILED'
-    \$results | ForEach-Object { Write-Host \$_.Message }
-} else {
-    Write-Host 'Windows setup.ps1: PASSED'
-}
-"
+if [ "$fail" -ne 0 ]; then
+  echo "Validation: FAILED"
+  exit 1
+fi
 
-echo "Validation complete."
+echo "Validation: PASSED"
