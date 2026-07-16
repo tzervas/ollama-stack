@@ -293,7 +293,9 @@ def run_performance_tests():
         print("API Response Times:")
         for name, data in results['api_performance'].items():
             if 'error' not in data:
-                print(".3f"            else:
+                avg = data.get("avg_response_time", data.get("response_time", 0))
+                print(f"  {name}: {avg:.3f}s avg")
+            else:
                 print(f"  {name}: ERROR - {data['error']}")
 
     if 'load_tests' in results:
