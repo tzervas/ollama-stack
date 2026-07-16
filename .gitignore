@@ -61,6 +61,15 @@ Thumbs.db
 logs/
 test/logs_*.txt
 
+# Test / coverage artifacts
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+coverage.xml
+test/coverage.html
+test/performance_results.json
+
 # Temporary files
 *.tmp
 *.temp
