@@ -1,5 +1,10 @@
 # Ollama + Open-WebUI Setup
 
+<!-- FLEET-BADGES:BEGIN -->
+[![CI](https://github.com/tzervas/ollama-stack/actions/workflows/fleet-ci.yml/badge.svg?branch=main)](https://github.com/tzervas/ollama-stack/actions/workflows/fleet-ci.yml?query=branch%3Amain)
+[![Security](https://github.com/tzervas/ollama-stack/actions/workflows/fleet-security.yml/badge.svg?branch=main)](https://github.com/tzervas/ollama-stack/actions/workflows/fleet-security.yml?query=branch%3Amain)
+<!-- FLEET-BADGES:END -->
+
 This setup provides a one-click experience to run Ollama + Open-WebUI with persistence across multiple platforms using a unified Python-based management script.
 
 ## Prerequisites
